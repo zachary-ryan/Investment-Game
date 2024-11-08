@@ -78,33 +78,43 @@
 
 <div class="game-container">
     <div class="info-bar">
-        <div>Budget Remaining: <span id="budget">$10,000</span></div>
+        <div>Budget Remaining: <span id="budget">$500</span></div>
         <div>Total Value: <span id="totalValue">0</span></div>
     </div>
     <h2>Period <span id="currentPeriod">1</span> of <span id="totalPeriods">6</span></h2>
 
-    <!-- Investment Card -->
-    <div class="investment-card">
-        <h3>Investment</h3>
-        <div class="value">Cost: $0 - $100 | Value: <span id="investmentValue">123</span></div>
-        <input type="number" id="investmentInput" min="0" max="100" placeholder="Enter Amount" oninput="syncSlider('investmentInput', 'investmentSlider')">
-        <div class="slider-container">
-            <input type="range" id="investmentSlider" min="0" max="100" oninput="syncInput('investmentSlider', 'investmentInput')">
-        </div>
-    </div>
-
+    <div id="investmentCardsContainer"></div>
     <button class="submit-button" onclick="submitRound()">Submit</button>
 </div>
 
 <script>
+    // Array to store game results for each round
+    const gameData = [];
+
     // Main game variables
-    let budget = 500;         // Starting budget of $10,000
-    let totalValue = 0;         // Initial total value is zero
-    let currentRound = 1;       // Start from round 1
-    const totalRounds = 10;      // Total number of rounds
+    const gameId = 'game_' + Date.now(); // Unique game ID
+    let budget = 500;         // Starting budget of $500
+    let totalValue = 0;       // Initial total value is zero
+    let currentRound = 1;     // Start from round 1
+    const totalRounds = 10;    // Total number of rounds
     let shockStandardDeviation = 0.3; // Default standard deviation for lognormal shocks
-    let useShocks = false;      // Toggle to determine if shocks are used
-    
+    let useShocks = false;    // Toggle to determine if shocks are used
+    const numInvestmentCards = 1; // Number of investment cards presented each round
+    let currentInvestmentData = generateInvestmentValues(numInvestmentCards);
+
+    // Function to sync slider with number input
+        function syncSlider(inputId, sliderId) {
+        const input = document.getElementById(inputId);
+        const slider = document.getElementById(sliderId);
+        slider.value = input.value;
+    }
+
+    // Function to sync number input with slider
+    function syncInput(sliderId, inputId) {
+        const slider = document.getElementById(sliderId);
+        const input = document.getElementById(inputId);
+        input.value = slider.value;
+    }
     // Display initial values on the UI
     document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
     document.getElementById("totalValue").textContent = totalValue;
@@ -119,135 +129,142 @@
         return Math.exp(mean + stdev * standardNormal);
     }
 
-    // Function to update investment card values each round
-    function generateInvestmentValues() {
-        let investmentValue;
-        let investmentCost;
+    // Function to generate investment card values each round
+    function generateInvestmentValues(numCards) {
+        const investmentData = [];
+        for (let i = 0; i < numCards; i++) {
+            let investmentValue;
+            let investmentCost;
 
-        if (useShocks) {
-            const shock = getLognormalShift(0, shockStandardDeviation);
-            investmentValue = Math.round(shock * 100);
-        } else {
-            investmentValue = Math.round(Math.random() * 100);
+            if (useShocks) {
+                const shock = getLognormalShift(0, shockStandardDeviation);
+                investmentValue = Math.round(shock * 100);
+            } else {
+                investmentValue = Math.round(Math.random() * 100);
+            }
+
+            investmentCost = Math.round(Math.random() * 100);
+            investmentData.push({
+                investmentValue,
+                investmentCost
+            });
         }
-
-        investmentCost = Math.round(Math.random() * 100);
-
-        document.querySelector("#investmentValue").textContent = investmentValue;
-
-        return {
-            investmentValue,
-            investmentCost
-        };
-    }
-    
-
-    let currentInvestmentData = generateInvestmentValues();
-
-    function syncInput(sliderId, inputId) {
-        const slider = document.getElementById(sliderId);
-        const input = document.getElementById(inputId);
-        input.value = slider.value;
-        validateInvestment(inputId, sliderId);
+        return investmentData;
     }
 
-    function syncSlider(inputId, sliderId) {
-        const input = document.getElementById(inputId);
-        const slider = document.getElementById(sliderId);
-        let value = parseInt(input.value);
-        if (isNaN(value)) {
-            value = 0;
-        }
-        input.value = value;
-        slider.value = value;
-        validateInvestment(inputId, sliderId);
-    }
+  // Function to reset inputs and generate new investment cards for the current round
+function resetInputs() {
+    const investmentCardsContainer = document.getElementById("investmentCardsContainer");
+    investmentCardsContainer.innerHTML = ""; // Clear previous cards
 
-    function validateInvestment(inputId, sliderId) {
-        const input = document.getElementById(inputId);
-        const slider = document.getElementById(sliderId);
-        const maxAllowable = Math.min(parseInt(input.getAttribute("max")), budget);
-
-        if (parseInt(input.value) > maxAllowable) {
-            input.value = maxAllowable;
-            slider.value = maxAllowable;
-        } else {
-            slider.value = input.value;
-        }
-    }
-
-    function submitRound() {
-        const investmentAmount = parseInt(document.getElementById("investmentInput").value) || 0;
-        const investmentValue = currentInvestmentData.investmentValue;
-        const investmentCost = currentInvestmentData.investmentCost;
-
-        if (investmentAmount >= investmentCost) {
-            totalValue += investmentValue;
-            alert(`Investment successful! Added $${investmentValue} to total value.`);
-        } else {
-            alert("Investment failed. Not enough to meet the required cost.");
-        }
-
-        budget -= investmentAmount;
-        document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
-        document.getElementById("totalValue").textContent = totalValue;
-
-        if (currentRound < totalRounds) {
-            currentRound++;
-            document.getElementById("currentPeriod").textContent = currentRound;
-            currentInvestmentData = generateInvestmentValues();
-            resetInputs();
-        } else {
-            alert("Game over!");
-            saveGameResults();
-        }
-    }
-
-    function resetInputs() {
-        document.getElementById("investmentInput").value = '';
-        document.getElementById("investmentSlider").value = 0;
-    }
-
-// Array to store game results for each round
-const gameData = [];
-
-// Function to save data for each round
-function saveRoundData(round, valueDisplayed, userSpent, actualCost, remainingBudget, totalValue) {
-    gameData.push({
-        Round: round,
-        ValueDisplayed: valueDisplayed,
-        UserSpent: userSpent,
-        ActualCost: actualCost,
-        RemainingBudget: remainingBudget,
-        TotalValue: totalValue
+    // Use currentInvestmentData to regenerate cards
+    currentInvestmentData.forEach((data, index) => {
+        const cardHtml = `
+            <div class="investment-card">
+                <h3>Investment ${index + 1}</h3>
+                <div class="value">Cost: $0 - $100 | Value: <span id="investmentValue${index}">${data.investmentValue}</span></div>
+                <input type="number" id="investmentInput${index}" min="0" max="100" placeholder="Enter Amount" 
+                       oninput="syncSlider('investmentInput${index}', 'investmentSlider${index}');">
+                <div class="slider-container">
+                    <input type="range" id="investmentSlider${index}" min="0" max="100" 
+                           oninput="syncInput('investmentSlider${index}', 'investmentInput${index}');">
+                </div>
+            </div>
+        `;
+        investmentCardsContainer.insertAdjacentHTML('beforeend', cardHtml);
     });
 }
 
-// Function to convert game data to CSV format
-function convertToCSV(data) {
-    const headers = [
-        "Round", "ValueDisplayed", "UserSpent", "ActualCost", "RemainingBudget", "TotalValue"
-    ];
+    // Initial reset to display investment cards for the first round
+    resetInputs();
 
-    const csvRows = data.map(row => headers.map(header => row[header]).join(","));
-    return [headers.join(","), ...csvRows].join("");
+    // Function to handle the submission of each round
+    function submitRound() {
+    let totalRoundValue = 0;
+    let totalRoundCost = 0;
+
+    for (let i = 0; i < currentInvestmentData.length; i++) {
+        const investmentAmount = parseInt(document.getElementById(`investmentInput${i}`).value) || 0;
+        const investmentValue = currentInvestmentData[i].investmentValue;
+        const investmentCost = currentInvestmentData[i].investmentCost;
+
+        if (investmentAmount >= investmentCost) {
+            totalRoundValue += investmentValue;
+            alert(`Investment ${i + 1} successful! Added $${investmentValue} to total value.`);
+        } else {
+            alert(`Investment ${i + 1} failed. Not enough to meet the required cost.`);
+        }
+
+        totalRoundCost += investmentAmount;
+    }
+
+    // Update total value and budget before any other actions
+    totalValue += totalRoundValue;
+    budget -= totalRoundCost;
+
+    // Update UI with new budget and value
+    document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
+    document.getElementById("totalValue").textContent = totalValue;
+
+    // Save round data
+    saveRoundData(currentRound, totalRoundValue, totalRoundCost, currentInvestmentData, budget, totalValue);
+
+    if (currentRound < totalRounds) {
+        // Move to the next round
+        currentRound++;
+        document.getElementById("currentPeriod").textContent = currentRound;
+
+        // Generate new investment data for next round and reset inputs
+        currentInvestmentData = generateInvestmentValues(numInvestmentCards);
+        resetInputs();
+    } else {
+        // End game and save results
+        saveGameResults(); // This will now be called after UI updates
+    }
 }
 
-// Function to download CSV file
-function downloadCSV(filename, csvContent) {
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.setAttribute("hidden", "");
-    a.setAttribute("href", url);
-    a.setAttribute("download", filename);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-}
 
-// Call this function after the final round is completed
-function saveGameResults() {
+    // Function to save data for each round
+    function saveRoundData(round, totalRoundValue, totalRoundCost, investmentData, remainingBudget, totalValue) {
+        investmentData.forEach((data, index) => {
+            gameData.push({
+                GameID: gameId,
+                Round: round,
+                Card: index + 1,
+                ValueDisplayed: data.investmentValue,
+                UserSpent: document.getElementById(`investmentInput${index}`).value || 0,
+                ActualCost: data.investmentCost,
+                RemainingBudget: remainingBudget,
+                TotalValue: totalValue
+            });
+        });
+    }
+
+    // Function to convert game data to CSV format
+    function convertToCSV(data) {
+        const headers = [
+            "GameID", "Round", "Card", "ValueDisplayed", "UserSpent", "ActualCost", "RemainingBudget", "TotalValue"
+        ];
+
+        const csvRows = data.map(row => headers.map(header => row[header]).join(","));
+        return [headers.join(","), ...csvRows].join("\n");
+    }
+
+    // Function to download CSV file
+    function downloadCSV(filename, csvContent) {
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.setAttribute("hidden", "");
+        a.setAttribute("href", url);
+        a.setAttribute("download", filename);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // Function to save game results after the final round is completed
+    function saveGameResults() {
     // Ask the user if they want to save the game results
     const saveConfirmation = confirm("Would you like to save your game results?");
 
@@ -262,36 +279,6 @@ function saveGameResults() {
     }
 }
 
-// Update submitRound function to save round data
-function submitRound() {
-    const investmentAmount = parseInt(document.getElementById("investmentInput").value) || 0;
-    const investmentValue = currentInvestmentData.investmentValue;
-    const investmentCost = currentInvestmentData.investmentCost;
-
-    if (investmentAmount >= investmentCost) {
-        totalValue += investmentValue;
-        alert(`Investment successful! Added $${investmentValue} to total value.`);
-    } else {
-        alert("Investment failed. Not enough to meet the required cost.");
-    }
-
-    budget -= investmentAmount;
-    document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
-    document.getElementById("totalValue").textContent = totalValue;
-
-    // Save round data
-    saveRoundData(currentRound, investmentValue, investmentAmount, investmentCost, budget, totalValue);
-
-    if (currentRound < totalRounds) {
-        currentRound++;
-        document.getElementById("currentPeriod").textContent = currentRound;
-        currentInvestmentData = generateInvestmentValues();
-        resetInputs();
-    } else {
-        alert("Game over!");
-        saveGameResults();
-    }
-}
 </script>
 
 </body>
