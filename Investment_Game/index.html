@@ -5,94 +5,181 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Investment Game</title>
 <style>
+    /* Global Styles */
     body {
-        font-family: Arial, sans-serif;
+        font-family: 'Roboto', sans-serif;
+        background-color: #f9fafb;
+        margin: 0;
+        padding: 0;
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
-        background-color: #f0f0f5;
-        margin: 0;
+        min-height: 100vh;
     }
 
+    /* Game Container */
     .game-container {
-        width: 300px;
+        width: 100%;
+        max-width: 400px;
         padding: 20px;
         border-radius: 10px;
-        background-color: #3366cc;
-        color: #fff;
+        background-color: #ffffff;
+        color: #333;
         text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
 
+    /* Info Bar */
     .info-bar {
-        font-size: 0.9em;
+        font-size: 1em;
         display: flex;
         justify-content: space-between;
         margin-bottom: 20px;
+        flex-wrap: wrap;
     }
 
-    .investment-card {
-        background-color: #ffffff;
-        color: #333;
-        padding: 10px;
-        border-radius: 5px;
+    .info-bar div {
+        flex: 1 1 45%;
         margin-bottom: 10px;
     }
 
+    .info-bar span {
+        font-weight: bold;
+        transition: transform 0.5s;
+        display: inline-block;
+    }
+
+    /* Investment Card */
+    .investment-card {
+        background-color: #f0f4f8;
+        color: #333;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
     .investment-card h3 {
-        margin: 5px 0;
-        font-size: 1.1em;
-        color: #3366cc;
+        margin: 5px 0 10px;
+        font-size: 1.2em;
+        color: #2a9d8f;
     }
 
     .investment-card .value {
+        font-size: 1em;
+        margin-bottom: 10px;
+    }
+
+    .investment-card .range-label {
         font-size: 0.9em;
-        margin-bottom: 5px;
+        margin-bottom: 10px;
+        color: #666;
     }
 
-    input[type="number"], input[type="range"] {
+    .investment-card input[type="number"],
+    .investment-card input[type="range"] {
         width: 100%;
+        margin-bottom: 10px;
     }
 
-    input[type="range"] {
-        margin-top: 5px;
-    }
-
+    /* Submit Button */
     .submit-button {
-        background-color: #4CAF50;
+        background-color: #e76f51;
         border: none;
         color: white;
-        padding: 10px 20px;
+        padding: 12px 20px;
         font-size: 1em;
         border-radius: 5px;
         cursor: pointer;
         width: 100%;
+        transition: background-color 0.3s;
+    }
+
+    .submit-button:hover {
+        background-color: #d65a3b;
     }
 
     .submit-button:disabled {
-        background-color: #888;
+        background-color: #aaa;
+        cursor: not-allowed;
     }
 
+    /* Message Area */
     .message-area {
-        margin-bottom: 10px;
-        font-size: 0.9em;
-        color: #fff;
+        margin-bottom: 15px;
+        font-size: 1em;
+        color: #333;
+        min-height: 40px;
+        transition: opacity 0.3s;
+    }
+
+    .message-area.hidden {
+        opacity: 0;
+    }
+
+    /* Reward Animation */
+    .confetti {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: hidden;
+        top: 0;
+        left: 0;
+    }
+
+    .confetti-piece {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: #f4a261;
+        opacity: 0;
+        animation: confetti 2s ease-out forwards;
+    }
+
+    @keyframes confetti {
+        0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(300px) rotate(720deg);
+            opacity: 0;
+        }
+    }
+
+    /* Remove Slider Highlight */
+    input[type="range"]::-moz-focus-outer {
+        border: 0;
+    }
+
+    input[type="range"]:focus {
+        outline: none;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 500px) {
+        .game-container {
+            padding: 15px;
+        }
     }
 </style>
 </head>
 <body>
 
-<div class="game-container">
+<div class="game-container" role="main">
     <div class="info-bar">
         <div>Budget Remaining: <span id="budget">$500</span></div>
         <div>Total Value: <span id="totalValue">0</span></div>
     </div>
     <h2>Period <span id="currentPeriod">1</span> of <span id="totalPeriods">10</span></h2>
 
-    <div id="messageArea" class="message-area"></div>
+    <div id="messageArea" class="message-area" aria-live="polite"></div>
     <div id="investmentCardsContainer"></div>
     <button id="submitButton" class="submit-button">Submit</button>
 </div>
+
+<div id="confettiContainer" class="confetti"></div>
 
 <script>
 (() => {
@@ -114,6 +201,7 @@
     const investmentCardsContainer = document.getElementById("investmentCardsContainer");
     const submitButton = document.getElementById("submitButton");
     const messageArea = document.getElementById("messageArea");
+    const confettiContainer = document.getElementById("confettiContainer");
 
     // Update UI with initial values
     updateUI();
@@ -157,10 +245,11 @@
 
             const cardHtml = `
                 <h3>Investment ${index + 1}</h3>
-                <div class="value">Value: $${data.investmentValue}</div>
-                <input type="number" id="investmentInput${index}" min="0" max="${maxRange}" placeholder="Enter Amount">
+                <div class="value">Potential Value: $${data.investmentValue}</div>
+                <div class="range-label">Investment Amount: $0 - $100</div>
+                <input type="number" id="investmentInput${index}" min="0" max="${maxRange}" placeholder="Enter Amount" aria-label="Investment Amount for Investment ${index + 1}">
                 <div class="slider-container">
-                    <input type="range" id="investmentSlider${index}" min="0" max="${maxRange}">
+                    <input type="range" id="investmentSlider${index}" min="0" max="${maxRange}" aria-label="Investment Slider for Investment ${index + 1}">
                 </div>
             `;
             cardDiv.innerHTML = cardHtml;
@@ -186,6 +275,7 @@
         let totalRoundValue = 0;
         let totalRoundCost = 0;
         let messages = [];
+        let investmentSuccess = false;
 
         for (let i = 0; i < currentInvestmentData.length; i++) {
             const inputElement = document.getElementById(`investmentInput${i}`);
@@ -203,6 +293,7 @@
             if (investmentAmount >= investmentCost) {
                 totalRoundValue += investmentValue;
                 messages.push(`Investment ${i + 1} successful! Added $${investmentValue} to total value.`);
+                investmentSuccess = true;
             } else {
                 messages.push(`Investment ${i + 1} failed. Your bid of $${investmentAmount} was less than the required cost.`);
             }
@@ -211,22 +302,27 @@
         // Validate if the total investment exceeds the budget
         if (totalRoundCost > budget) {
             messages = ['You have exceeded your remaining budget. Please adjust your investments.'];
-            messageArea.innerHTML = messages.join('<br>');
+            displayMessages(messages);
             return;
         }
 
-        // Update total value and budget
-        totalValue += totalRoundValue;
-        budget -= totalRoundCost;
+        // Update total value and budget with animation
+        animateValueChange(budgetElement, budget, budget - totalRoundCost);
+        animateValueChange(totalValueElement, totalValue, totalValue + totalRoundValue);
 
-        // Update UI with new budget and value
-        updateUI();
+        budget -= totalRoundCost;
+        totalValue += totalRoundValue;
 
         // Save round data
         saveRoundData(currentRound, totalRoundValue, totalRoundCost, currentInvestmentData, budget, totalValue);
 
         // Display messages
-        messageArea.innerHTML = messages.join('<br>');
+        displayMessages(messages);
+
+        // Trigger reward animation if investment was successful
+        if (investmentSuccess) {
+            triggerConfetti();
+        }
 
         if (currentRound < totalRounds) {
             // Move to the next round
@@ -239,6 +335,55 @@
         } else {
             saveGameResults();
         }
+    }
+
+    // Function to animate value changes
+    function animateValueChange(element, startValue, endValue) {
+        let startTimestamp = null;
+        const duration = 500;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const currentValue = Math.floor(progress * (endValue - startValue) + startValue);
+            element.textContent = `$${currentValue.toLocaleString()}`;
+            element.style.transform = 'scale(1.1)';
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            } else {
+                element.style.transform = 'scale(1)';
+            }
+        };
+        window.requestAnimationFrame(step);
+    }
+
+    // Function to display messages with animation
+    function displayMessages(messages) {
+        messageArea.classList.remove('hidden');
+        messageArea.innerHTML = messages.join('<br>');
+        setTimeout(() => {
+            messageArea.classList.add('hidden');
+        }, 5000);
+    }
+
+    // Function to trigger confetti animation
+    function triggerConfetti() {
+        const confettiCount = 20;
+        for (let i = 0; i < confettiCount; i++) {
+            const confettiPiece = document.createElement('div');
+            confettiPiece.className = 'confetti-piece';
+            confettiPiece.style.left = Math.random() * 100 + '%';
+            confettiPiece.style.backgroundColor = getRandomColor();
+            confettiContainer.appendChild(confettiPiece);
+            setTimeout(() => {
+                confettiContainer.removeChild(confettiPiece);
+            }, 2000);
+        }
+    }
+
+    // Function to get random color for confetti
+    function getRandomColor() {
+        const colors = ['#e76f51', '#2a9d8f', '#e9c46a', '#f4a261', '#264653'];
+        return colors[Math.floor(Math.random() * colors.length)];
     }
 
     // Function to save data for each round
