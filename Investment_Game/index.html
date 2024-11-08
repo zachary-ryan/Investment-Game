@@ -72,6 +72,12 @@
     .submit-button:disabled {
         background-color: #888;
     }
+
+    .message-area {
+        margin-bottom: 10px;
+        font-size: 0.9em;
+        color: #fff;
+    }
 </style>
 </head>
 <body>
@@ -81,69 +87,57 @@
         <div>Budget Remaining: <span id="budget">$500</span></div>
         <div>Total Value: <span id="totalValue">0</span></div>
     </div>
-    <h2>Period <span id="currentPeriod">1</span> of <span id="totalPeriods">6</span></h2>
+    <h2>Period <span id="currentPeriod">1</span> of <span id="totalPeriods">10</span></h2>
 
+    <div id="messageArea" class="message-area"></div>
     <div id="investmentCardsContainer"></div>
-    <button class="submit-button" onclick="submitRound()">Submit</button>
+    <button id="submitButton" class="submit-button">Submit</button>
 </div>
 
 <script>
-    // Array to store game results for each round
+(() => {
+    // Game data and variables
     const gameData = [];
-
-    // Main game variables
-    const gameId = 'game_' + Date.now(); // Unique game ID
-    let budget = 500;         // Starting budget of $500
-    let totalValue = 0;       // Initial total value is zero
-    let currentRound = 1;     // Start from round 1
-    const totalRounds = 10;    // Total number of rounds
-    let shockStandardDeviation = 0.3; // Default standard deviation for lognormal shocks
-    let useShocks = false;    // Toggle to determine if shocks are used
-    const numInvestmentCards = 1; // Number of investment cards presented each round
+    const gameId = `game_${Date.now()}`;
+    let budget = 500;
+    let totalValue = 0;
+    let currentRound = 1;
+    const totalRounds = 10;
+    const numInvestmentCards = 1;
     let currentInvestmentData = generateInvestmentValues(numInvestmentCards);
 
-    // Function to sync slider with number input
-        function syncSlider(inputId, sliderId) {
-        const input = document.getElementById(inputId);
-        const slider = document.getElementById(sliderId);
-        slider.value = input.value;
+    // UI elements
+    const budgetElement = document.getElementById("budget");
+    const totalValueElement = document.getElementById("totalValue");
+    const currentPeriodElement = document.getElementById("currentPeriod");
+    const totalPeriodsElement = document.getElementById("totalPeriods");
+    const investmentCardsContainer = document.getElementById("investmentCardsContainer");
+    const submitButton = document.getElementById("submitButton");
+    const messageArea = document.getElementById("messageArea");
+
+    // Update UI with initial values
+    updateUI();
+
+    // Event listener for the submit button
+    submitButton.addEventListener('click', submitRound);
+
+    // Generate initial investment cards
+    resetInputs();
+
+    // Function to update the UI elements
+    function updateUI() {
+        budgetElement.textContent = `$${budget.toLocaleString()}`;
+        totalValueElement.textContent = totalValue;
+        currentPeriodElement.textContent = currentRound;
+        totalPeriodsElement.textContent = totalRounds;
     }
 
-    // Function to sync number input with slider
-    function syncInput(sliderId, inputId) {
-        const slider = document.getElementById(sliderId);
-        const input = document.getElementById(inputId);
-        input.value = slider.value;
-    }
-    // Display initial values on the UI
-    document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
-    document.getElementById("totalValue").textContent = totalValue;
-    document.getElementById("currentPeriod").textContent = currentRound;
-    document.getElementById("totalPeriods").textContent = totalRounds;
-
-    // Function to generate a lognormal shift (used for generating shocks each period)
-    function getLognormalShift(mean, stdev) {
-        const u1 = Math.random();
-        const u2 = Math.random();
-        const standardNormal = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-        return Math.exp(mean + stdev * standardNormal);
-    }
-
-    // Function to generate investment card values each round
+    // Function to generate random investment values and hidden costs
     function generateInvestmentValues(numCards) {
         const investmentData = [];
         for (let i = 0; i < numCards; i++) {
-            let investmentValue;
-            let investmentCost;
-
-            if (useShocks) {
-                const shock = getLognormalShift(0, shockStandardDeviation);
-                investmentValue = Math.round(shock * 100);
-            } else {
-                investmentValue = Math.round(Math.random() * 100);
-            }
-
-            investmentCost = Math.round(Math.random() * 100);
+            const investmentValue = Math.floor(Math.random() * 100) + 1;
+            const investmentCost = Math.floor(Math.random() * 100) + 1;
             investmentData.push({
                 investmentValue,
                 investmentCost
@@ -152,77 +146,100 @@
         return investmentData;
     }
 
-  // Function to reset inputs and generate new investment cards for the current round
-function resetInputs() {
-    const investmentCardsContainer = document.getElementById("investmentCardsContainer");
-    investmentCardsContainer.innerHTML = ""; // Clear previous cards
+    // Function to reset inputs and generate new investment cards
+    function resetInputs() {
+        investmentCardsContainer.innerHTML = '';
+        currentInvestmentData.forEach((data, index) => {
+            const maxRange = 100; // User can invest between $0 and $100 per card
 
-    // Use currentInvestmentData to regenerate cards
-    currentInvestmentData.forEach((data, index) => {
-        const cardHtml = `
-            <div class="investment-card">
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'investment-card';
+
+            const cardHtml = `
                 <h3>Investment ${index + 1}</h3>
-                <div class="value">Cost: $0 - $100 | Value: <span id="investmentValue${index}">${data.investmentValue}</span></div>
-                <input type="number" id="investmentInput${index}" min="0" max="100" placeholder="Enter Amount" 
-                       oninput="syncSlider('investmentInput${index}', 'investmentSlider${index}');">
+                <div class="value">Value: $${data.investmentValue}</div>
+                <input type="number" id="investmentInput${index}" min="0" max="${maxRange}" placeholder="Enter Amount">
                 <div class="slider-container">
-                    <input type="range" id="investmentSlider${index}" min="0" max="100" 
-                           oninput="syncInput('investmentSlider${index}', 'investmentInput${index}');">
+                    <input type="range" id="investmentSlider${index}" min="0" max="${maxRange}">
                 </div>
-            </div>
-        `;
-        investmentCardsContainer.insertAdjacentHTML('beforeend', cardHtml);
-    });
-}
+            `;
+            cardDiv.innerHTML = cardHtml;
 
-    // Initial reset to display investment cards for the first round
-    resetInputs();
+            investmentCardsContainer.appendChild(cardDiv);
+
+            const inputElement = cardDiv.querySelector(`#investmentInput${index}`);
+            const sliderElement = cardDiv.querySelector(`#investmentSlider${index}`);
+
+            // Synchronize input and slider values
+            inputElement.addEventListener('input', () => {
+                sliderElement.value = inputElement.value;
+            });
+
+            sliderElement.addEventListener('input', () => {
+                inputElement.value = sliderElement.value;
+            });
+        });
+    }
 
     // Function to handle the submission of each round
     function submitRound() {
-    let totalRoundValue = 0;
-    let totalRoundCost = 0;
+        let totalRoundValue = 0;
+        let totalRoundCost = 0;
+        let messages = [];
 
-    for (let i = 0; i < currentInvestmentData.length; i++) {
-        const investmentAmount = parseInt(document.getElementById(`investmentInput${i}`).value) || 0;
-        const investmentValue = currentInvestmentData[i].investmentValue;
-        const investmentCost = currentInvestmentData[i].investmentCost;
+        for (let i = 0; i < currentInvestmentData.length; i++) {
+            const inputElement = document.getElementById(`investmentInput${i}`);
+            const investmentAmount = parseInt(inputElement.value) || 0;
+            const investmentValue = currentInvestmentData[i].investmentValue;
+            const investmentCost = currentInvestmentData[i].investmentCost;
 
-        if (investmentAmount >= investmentCost) {
-            totalRoundValue += investmentValue;
-            alert(`Investment ${i + 1} successful! Added $${investmentValue} to total value.`);
-        } else {
-            alert(`Investment ${i + 1} failed. Not enough to meet the required cost.`);
+            if (investmentAmount < 0 || investmentAmount > 100) {
+                messages.push(`Investment ${i + 1}: Amount must be between $0 and $100.`);
+                continue;
+            }
+
+            totalRoundCost += investmentAmount;
+
+            if (investmentAmount >= investmentCost) {
+                totalRoundValue += investmentValue;
+                messages.push(`Investment ${i + 1} successful! Added $${investmentValue} to total value.`);
+            } else {
+                messages.push(`Investment ${i + 1} failed. Your bid of $${investmentAmount} was less than the required cost.`);
+            }
         }
 
-        totalRoundCost += investmentAmount;
+        // Validate if the total investment exceeds the budget
+        if (totalRoundCost > budget) {
+            messages = ['You have exceeded your remaining budget. Please adjust your investments.'];
+            messageArea.innerHTML = messages.join('<br>');
+            return;
+        }
+
+        // Update total value and budget
+        totalValue += totalRoundValue;
+        budget -= totalRoundCost;
+
+        // Update UI with new budget and value
+        updateUI();
+
+        // Save round data
+        saveRoundData(currentRound, totalRoundValue, totalRoundCost, currentInvestmentData, budget, totalValue);
+
+        // Display messages
+        messageArea.innerHTML = messages.join('<br>');
+
+        if (currentRound < totalRounds) {
+            // Move to the next round
+            currentRound++;
+            currentPeriodElement.textContent = currentRound;
+
+            // Generate new investment data for next round and reset inputs
+            currentInvestmentData = generateInvestmentValues(numInvestmentCards);
+            resetInputs();
+        } else {
+            saveGameResults();
+        }
     }
-
-    // Update total value and budget before any other actions
-    totalValue += totalRoundValue;
-    budget -= totalRoundCost;
-
-    // Update UI with new budget and value
-    document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
-    document.getElementById("totalValue").textContent = totalValue;
-
-    // Save round data
-    saveRoundData(currentRound, totalRoundValue, totalRoundCost, currentInvestmentData, budget, totalValue);
-
-    if (currentRound < totalRounds) {
-        // Move to the next round
-        currentRound++;
-        document.getElementById("currentPeriod").textContent = currentRound;
-
-        // Generate new investment data for next round and reset inputs
-        currentInvestmentData = generateInvestmentValues(numInvestmentCards);
-        resetInputs();
-    } else {
-        // End game and save results
-        saveGameResults(); // This will now be called after UI updates
-    }
-}
-
 
     // Function to save data for each round
     function saveRoundData(round, totalRoundValue, totalRoundCost, investmentData, remainingBudget, totalValue) {
@@ -232,7 +249,7 @@ function resetInputs() {
                 Round: round,
                 Card: index + 1,
                 ValueDisplayed: data.investmentValue,
-                UserSpent: document.getElementById(`investmentInput${index}`).value || 0,
+                UserSpent: parseInt(document.getElementById(`investmentInput${index}`).value) || 0,
                 ActualCost: data.investmentCost,
                 RemainingBudget: remainingBudget,
                 TotalValue: totalValue
@@ -263,22 +280,19 @@ function resetInputs() {
         document.body.removeChild(a);
     }
 
-    // Function to save game results after the final round is completed
+    // Function to save game results after the final round
     function saveGameResults() {
-    // Ask the user if they want to save the game results
-    const saveConfirmation = confirm("Would you like to save your game results?");
-
-    // If the user confirms, generate and download the CSV file
-    if (saveConfirmation) {
-        const csvContent = convertToCSV(gameData);
-        const filename = `game_results.csv`;
-        downloadCSV(filename, csvContent);
-        alert("Your game results have been saved.");
-    } else {
-        alert("Game results were not saved.");
+        const saveConfirmation = confirm("Would you like to save your game results?");
+        if (saveConfirmation) {
+            const csvContent = convertToCSV(gameData);
+            const filename = `game_results.csv`;
+            downloadCSV(filename, csvContent);
+            alert("Your game results have been saved.");
+        } else {
+            alert("Game results were not saved.");
+        }
     }
-}
-
+})();
 </script>
 
 </body>
