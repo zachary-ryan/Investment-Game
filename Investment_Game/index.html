@@ -50,13 +50,6 @@
         margin-bottom: 5px;
     }
 
-    .slider-container {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin: 10px 0;
-    }
-
     input[type="number"], input[type="range"] {
         width: 100%;
     }
@@ -85,27 +78,18 @@
 
 <div class="game-container">
     <div class="info-bar">
-        <div>Budget Remaining: <span id="budget">$999,999</span></div>
-        <div>Total Value: <span id="totalValue">123,456</span></div>
+        <div>Budget Remaining: <span id="budget">$10,000</span></div>
+        <div>Total Value: <span id="totalValue">0</span></div>
     </div>
-    <h2>Period <span id="currentPeriod">1</span> of <span id="totalPeriods">Y</span></h2>
+    <h2>Period <span id="currentPeriod">1</span> of <span id="totalPeriods">6</span></h2>
 
-    <!-- Investment Card 1 -->
+    <!-- Investment Card -->
     <div class="investment-card">
-        <h3>Investment 1</h3>
-        <div class="value">Cost: <span id="investment1Range">$XX - $XXX</span> | Value: <span id="investment1Value">123</span></div>
-        <input type="number" id="investment1Input" min="0" placeholder="Enter Amount" oninput="syncSlider('investment1Input', 'investment1Slider')">
+        <h3>Investment</h3>
+        <div class="value">Cost: $0 - $100 | Value: <span id="investmentValue">123</span></div>
+        <input type="number" id="investmentInput" min="0" max="100" placeholder="Enter Amount" oninput="syncSlider('investmentInput', 'investmentSlider')">
         <div class="slider-container">
-            <input type="range" id="investment1Slider" min="0" max="1000" oninput="syncInput('investment1Slider', 'investment1Input')">
-        </div>
-    </div>
-    
-    <div class="investment-card">
-        <h3>Investment 2</h3>
-        <div class="value">Cost: <span id="investment2Range">$XX - $XXX</span> | Value: <span id="investment2Value">123</span></div>
-        <input type="number" id="investment2Input" min="0" placeholder="Enter Amount" oninput="syncSlider('investment2Input', 'investment2Slider')">
-        <div class="slider-container">
-            <input type="range" id="investment2Slider" min="0" max="1000" oninput="syncInput('investment2Slider', 'investment2Input')">
+            <input type="range" id="investmentSlider" min="0" max="100" oninput="syncInput('investmentSlider', 'investmentInput')">
         </div>
     </div>
 
@@ -114,212 +98,139 @@
 
 <script>
     // Main game variables
-    let budget = 10000;         // Starting budget of $10,000
+    let budget = 500;         // Starting budget of $10,000
     let totalValue = 0;         // Initial total value is zero
     let currentRound = 1;       // Start from round 1
-    const totalRounds = 6;      // Total number of rounds
-    let cumulativeShock = 1;    //variable to store cumulative shock, starting with 1
-    let shockStandardDeviation = .3; // Default standard deviation for lognormal shocks
-    let useCumulativeShocks = false; // Toggle to determine if cumulative shocks are used
-    let penaltyPoints = 0;      // penalty points variable for running out of funds
-
-    // Investment parameters
-    const investment1BaseRange = [1000, 2000];   // Starting range for Investment 1
-    const investment2BaseRange = [1000, 2000];    // Starting range for Investment 2
-    const investment1BaseValue = 1000;            // Base mean value for Investment 1
-    const valueIncreaseFactor = 1;             // 10% increase for Investment 2
-
+    const totalRounds = 10;      // Total number of rounds
+    let shockStandardDeviation = 0.3; // Default standard deviation for lognormal shocks
+    let useShocks = false;      // Toggle to determine if shocks are used
+    
     // Display initial values on the UI
     document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
     document.getElementById("totalValue").textContent = totalValue;
     document.getElementById("currentPeriod").textContent = currentRound;
     document.getElementById("totalPeriods").textContent = totalRounds;
 
-// Function to generate a lognormal shift (used for generating shocks each period)
-function getLognormalShift(mean, stdev) {
-    // Generate a standard normal variable using the Box-Muller transform
-    const u1 = Math.random();
-    const u2 = Math.random();
-    const standardNormal = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-
-    // Scale by mean and stdev, then exponentiate to get a lognormal value
-    return Math.exp(mean + stdev * standardNormal);
-}
-
-// Function to update investment card values each round
-function generateInvestmentValues() {
-    // Define mean base costs for Investment 1 and Investment 2
-    const investment1BaseMean = 1000;  // Base mean for Investment 1
-    const investment2BaseMean = 1000;  // Base mean for Investment 2
-
-    let shock;
-
-    if (useCumulativeShocks) {
-        // Generate a new shock multiplier and accumulate it
-        shock = getLognormalShift(0, shockStandardDeviation);
-        cumulativeShock *= shock;  // Update cumulative shock by multiplying with the new shock
-    } else {
-        // If not using cumulative shocks, generate a new shock without accumulating
-        cumulativeShock = getLognormalShift(0, shockStandardDeviation);
+    // Function to generate a lognormal shift (used for generating shocks each period)
+    function getLognormalShift(mean, stdev) {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const standardNormal = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        return Math.exp(mean + stdev * standardNormal);
     }
 
-    // Apply cumulative or independent shock to adjust mean cost for each investment
-    const adjustedMean1 = Math.round(investment1BaseMean * cumulativeShock / 10) * 10;
-    const adjustedMean2 = Math.round(investment2BaseMean * cumulativeShock / 10) * 10;
+    // Function to update investment card values each round
+    function generateInvestmentValues() {
+        let investmentValue;
+        let investmentCost;
 
-    // Define range width as a proportion of the adjusted mean
-    const rangeProportion1 = 0.5;  // Range will be ±50% of the mean for Investment 1
-    const rangeProportion2 = 0.70; // Range will be ±70% of the mean for Investment 2
+        if (useShocks) {
+            const shock = getLognormalShift(0, shockStandardDeviation);
+            investmentValue = Math.round(shock * 100);
+        } else {
+            investmentValue = Math.round(Math.random() * 100);
+        }
 
-    // Calculate range for Investment 1 based on the adjusted mean
-    const investment1Range = [
-        Math.max(10, Math.round((adjustedMean1 * (1 - rangeProportion1)) / 10) * 10),  // Lower bound is 50% below the mean
-        Math.round((adjustedMean1 * (1 + rangeProportion1)) / 10) * 10                  // Upper bound is 50% above the mean
-    ];
+        investmentCost = Math.round(Math.random() * 100);
 
-    // Calculate range for Investment 2 based on the adjusted mean
-    const investment2Range = [
-        Math.max(10, Math.round((adjustedMean2 * (1 - rangeProportion2)) / 10) * 10),   // Lower bound is 70% below the mean
-        Math.round((adjustedMean2 * (1 + rangeProportion2)) / 10) * 10                  // Upper bound is 70% above the mean
-    ];
+        document.querySelector("#investmentValue").textContent = investmentValue;
 
-    // Calculate actual costs by selecting a random value within the range
-    const investment1ActualCost = Math.round(
-        (investment1Range[0] + Math.random() * (investment1Range[1] - investment1Range[0])) / 10
-    ) * 10;
+        return {
+            investmentValue,
+            investmentCost
+        };
+    }
+    
 
-    const investment2ActualCost = Math.round(
-        (investment2Range[0] + Math.random() * (investment2Range[1] - investment2Range[0])) / 10
-    ) * 10;
+    let currentInvestmentData = generateInvestmentValues();
 
-    // Calculate values for Investment 1 and Investment 2 using the cumulative or independent shock applied to their means
-    const investment1Value = Math.round(adjustedMean1 * 2 / 10) * 10;
-    const investment2Value = Math.round(adjustedMean2 * 2.10 / 10) * 10;
-
-    // Update the UI with generated values
-    document.querySelector("#investment1Value").textContent = investment1Value;
-    document.querySelector("#investment2Value").textContent = investment2Value;
-
-    // Update cost ranges in the UI
-    document.querySelector("#investment1Range").textContent = `$${investment1Range[0]} - $${investment1Range[1]}`;
-    document.querySelector("#investment2Range").textContent = `$${investment2Range[0]} - $${investment2Range[1]}`;
-
-    // Update input fields and sliders
-    document.querySelector("#investment1Input").setAttribute("min", investment1Range[0]);
-    document.querySelector("#investment1Input").setAttribute("max", investment1Range[1]);
-    document.querySelector("#investment1Slider").setAttribute("min", investment1Range[0]);
-    document.querySelector("#investment1Slider").setAttribute("max", investment1Range[1]);
-    document.querySelector("#investment2Input").setAttribute("min", investment2Range[0]);
-    document.querySelector("#investment2Input").setAttribute("max", investment2Range[1]);
-    document.querySelector("#investment2Slider").setAttribute("min", investment2Range[0]);
-    document.querySelector("#investment2Slider").setAttribute("max", investment2Range[1]);
-
-    // Save the actual costs and ranges for validation later, including mean value for Investment 1
-    return {
-        investment1Range,          // Including investment 1 range in return value
-        investment1ActualCost,
-        investment1Value,
-        investment1Mean: adjustedMean1,  // Including the mean value for Investment 1
-        investment2Range,          // Including investment 2 range in return value
-        investment2ActualCost,
-        investment2Value
-    };
-}
-
-// Initial generation of investment values
-let currentInvestmentData = generateInvestmentValues();
-
-// Function to check and adjust if total investment exceeds remaining budget
-function validateInvestment(inputId, sliderId) {
-    const input = document.getElementById(inputId);
-    const slider = document.getElementById(sliderId);
-    let otherInvestment = 0;
-
-    // Determine the other investment amount
-    if (inputId === "investment1Input") {
-        otherInvestment = parseInt(document.getElementById("investment2Input").value) || 0;
-    } else {
-        otherInvestment = parseInt(document.getElementById("investment1Input").value) || 0;
+    function syncInput(sliderId, inputId) {
+        const slider = document.getElementById(sliderId);
+        const input = document.getElementById(inputId);
+        input.value = slider.value;
+        validateInvestment(inputId, sliderId);
     }
 
-    // Calculate the max allowable for this investment
-    const maxAllowable = Math.max(0, budget - otherInvestment);
-
-    // Adjust input and slider if the entered amount exceeds the allowable budget
-    if (parseInt(input.value) > maxAllowable) {
-        input.value = maxAllowable;
-        slider.value = maxAllowable;
-    } else {
-        slider.value = input.value;
-    }
-}
-
-// Sync the slider with the input box for Investment 1 and Investment 2
-function syncInput(sliderId, inputId) {
-    const slider = document.getElementById(sliderId);
-    const input = document.getElementById(inputId);
-    input.value = slider.value;
-    validateInvestment(inputId, sliderId);
-}
-
-function syncSlider(inputId, sliderId) {
-    const input = document.getElementById(inputId);
-    const slider = document.getElementById(sliderId);
-
-    let value = parseInt(input.value);
-    if (isNaN(value)) {
-        value = 0;
+    function syncSlider(inputId, sliderId) {
+        const input = document.getElementById(inputId);
+        const slider = document.getElementById(sliderId);
+        let value = parseInt(input.value);
+        if (isNaN(value)) {
+            value = 0;
+        }
+        input.value = value;
+        slider.value = value;
+        validateInvestment(inputId, sliderId);
     }
 
-    input.value = value;
-    slider.value = value;
-    validateInvestment(inputId, sliderId);
-}
+    function validateInvestment(inputId, sliderId) {
+        const input = document.getElementById(inputId);
+        const slider = document.getElementById(sliderId);
+        const maxAllowable = Math.min(parseInt(input.getAttribute("max")), budget);
 
-// Function to reset inputs and sliders at the start of each round
-function resetInputs() {
-    document.getElementById("investment1Input").value = '';
-    document.getElementById("investment1Slider").value = document.getElementById("investment1Slider").min;
-    document.getElementById("investment2Input").value = '';
-    document.getElementById("investment2Slider").value = document.getElementById("investment2Slider").min;
-}
+        if (parseInt(input.value) > maxAllowable) {
+            input.value = maxAllowable;
+            slider.value = maxAllowable;
+        } else {
+            slider.value = input.value;
+        }
+    }
 
-// Generate a unique Game ID (e.g., using timestamp)
-const gameId = 'game_' + Date.now();
+    function submitRound() {
+        const investmentAmount = parseInt(document.getElementById("investmentInput").value) || 0;
+        const investmentValue = currentInvestmentData.investmentValue;
+        const investmentCost = currentInvestmentData.investmentCost;
+
+        if (investmentAmount >= investmentCost) {
+            totalValue += investmentValue;
+            alert(`Investment successful! Added $${investmentValue} to total value.`);
+        } else {
+            alert("Investment failed. Not enough to meet the required cost.");
+        }
+
+        budget -= investmentAmount;
+        document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
+        document.getElementById("totalValue").textContent = totalValue;
+
+        if (currentRound < totalRounds) {
+            currentRound++;
+            document.getElementById("currentPeriod").textContent = currentRound;
+            currentInvestmentData = generateInvestmentValues();
+            resetInputs();
+        } else {
+            alert("Game over!");
+            saveGameResults();
+        }
+    }
+
+    function resetInputs() {
+        document.getElementById("investmentInput").value = '';
+        document.getElementById("investmentSlider").value = 0;
+    }
 
 // Array to store game results for each round
 const gameData = [];
 
 // Function to save data for each round
-function saveRoundData(round, investment1, investment2, endingBudget, endingValue) {
+function saveRoundData(round, valueDisplayed, userSpent, actualCost, remainingBudget, totalValue) {
     gameData.push({
-        GameID: gameId,
         Round: round,
-        Investment1RangeMin: investment1.range[0],
-        Investment1RangeMax: investment1.range[1],
-        Investment1Value: investment1.value,
-        Investment1Cost: investment1.cost,
-        Investment1Spent: investment1.spent,
-        Investment2RangeMin: investment2.range[0],
-        Investment2RangeMax: investment2.range[1],
-        Investment2Value: investment2.value,
-        Investment2Cost: investment2.cost,
-        Investment2Spent: investment2.spent,
-        EndingBudget: endingBudget,
-        EndingValue: endingValue
+        ValueDisplayed: valueDisplayed,
+        UserSpent: userSpent,
+        ActualCost: actualCost,
+        RemainingBudget: remainingBudget,
+        TotalValue: totalValue
     });
 }
 
 // Function to convert game data to CSV format
 function convertToCSV(data) {
     const headers = [
-        "GameID", "Round", "Investment1RangeMin", "Investment1RangeMax", "Investment1Value", 
-        "Investment1Cost", "Investment1Spent", "Investment2RangeMin", "Investment2RangeMax", 
-        "Investment2Value", "Investment2Cost", "Investment2Spent", "EndingBudget", "EndingValue"
+        "Round", "ValueDisplayed", "UserSpent", "ActualCost", "RemainingBudget", "TotalValue"
     ];
 
     const csvRows = data.map(row => headers.map(header => row[header]).join(","));
-    return [headers.join(","), ...csvRows].join("\n");
+    return [headers.join(","), ...csvRows].join("");
 }
 
 // Function to download CSV file
@@ -336,7 +247,6 @@ function downloadCSV(filename, csvContent) {
 }
 
 // Call this function after the final round is completed
-// Function to save game results with user confirmation
 function saveGameResults() {
     // Ask the user if they want to save the game results
     const saveConfirmation = confirm("Would you like to save your game results?");
@@ -344,7 +254,7 @@ function saveGameResults() {
     // If the user confirms, generate and download the CSV file
     if (saveConfirmation) {
         const csvContent = convertToCSV(gameData);
-        const filename = `${gameId}_game_results.csv`;
+        const filename = `game_results.csv`;
         downloadCSV(filename, csvContent);
         alert("Your game results have been saved.");
     } else {
@@ -352,71 +262,36 @@ function saveGameResults() {
     }
 }
 
-
-// Function to handle the submission of each round
+// Update submitRound function to save round data
 function submitRound() {
-    const investment1Amount = parseInt(document.getElementById("investment1Input").value) || 0;
-    const investment2Amount = parseInt(document.getElementById("investment2Input").value) || 0;
+    const investmentAmount = parseInt(document.getElementById("investmentInput").value) || 0;
+    const investmentValue = currentInvestmentData.investmentValue;
+    const investmentCost = currentInvestmentData.investmentCost;
 
-    // Get the mean value for Investment 1 from current investment data
-    const meanInvestment1 = currentInvestmentData.investment1Mean;
-
-    // Check if the player spent less than the mean value on Investment 1
-    if (investment1Amount < meanInvestment1) {
-        // Calculate penalty as a proportion of the difference
-        const penaltyDifference = meanInvestment1 - investment1Amount; // Only consider the difference if under the mean
-        let penalty = penaltyDifference * 0.1; // Penalty is 10% of the difference
-        penalty = Math.round(penalty); // Round the penalty to ensure no decimals
-        penaltyPoints += penalty;
-
-        // Apply penalty to the total value
-        totalValue -= penalty;
-        if (totalValue < 0) {
-            totalValue = 0; // Ensure total value doesn't go below zero
-        }
-
-        alert(`Penalty applied! You must spend at least the mean on Investment 1. Penalty deducted from total value: $${penalty}`);
-    }
-
-    // Check if investment meets or exceeds actual costs and update values
-    if (investment1Amount >= currentInvestmentData.investment1ActualCost) {
-        totalValue += currentInvestmentData.investment1Value;
-        alert(`Investment 1 successful! Added $${currentInvestmentData.investment1Value} to total value.`);
+    if (investmentAmount >= investmentCost) {
+        totalValue += investmentValue;
+        alert(`Investment successful! Added $${investmentValue} to total value.`);
     } else {
-        alert("Investment 1 failed. Not enough to meet the cost.");
+        alert("Investment failed. Not enough to meet the required cost.");
     }
 
-    if (investment2Amount >= currentInvestmentData.investment2ActualCost) {
-        totalValue += currentInvestmentData.investment2Value;
-        alert(`Investment 2 successful! Added $${currentInvestmentData.investment2Value} to total value.`);
-    } else {
-        alert("Investment 2 failed. Not enough to meet the cost.");
-    }
-
-    // Deduct the amounts spent from the budget
-    budget -= (investment1Amount + investment2Amount);
+    budget -= investmentAmount;
     document.getElementById("budget").textContent = `$${budget.toLocaleString()}`;
     document.getElementById("totalValue").textContent = totalValue;
 
-        // Prepare for the next round or save game results if the final round is over
+    // Save round data
+    saveRoundData(currentRound, investmentValue, investmentAmount, investmentCost, budget, totalValue);
+
     if (currentRound < totalRounds) {
         currentRound++;
         document.getElementById("currentPeriod").textContent = currentRound;
         currentInvestmentData = generateInvestmentValues();
-        resetInputs(); // Reset input fields and sliders
+        resetInputs();
     } else {
         alert("Game over!");
         saveGameResults();
     }
 }
-
-
-
-
-    // Display end-of-game summary
-    function displayEndSummary() {
-        alert(`Game Summary:\nTotal Value: $${totalValue}\nBudget Left: $${budget}\nMarginal Value (Value/Cost): ${(totalValue / (10000 - budget)).toFixed(2)}`);
-    }
 </script>
 
 </body>
