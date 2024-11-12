@@ -147,6 +147,29 @@
             opacity: 0;
         }
     }
+    /* Summary Page */
+    .summary-page {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    text-align: center;
+    overflow: hidden;
+    }
+
+    .summary-page canvas {
+    width: 100%;
+    max-width: 100%;
+    height: 300px; /* Set a fixed height */
+    overflow: hidden;
+}
+    .summary-metrics {
+    margin-bottom: 20px;
+    }
+
+    .summary-metrics p {
+    font-size: 1.1em;
+    margin: 10px 0;
+    }
 
     /* Remove Slider Highlight */
     input[type="range"]::-moz-focus-outer {
@@ -164,6 +187,9 @@
         }
     }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
 <body>
 
@@ -179,6 +205,19 @@
     <button id="submitButton" class="submit-button">Submit</button>
 </div>
 
+<div id="summaryPage" class="summary-page" style="display: none;">
+    <h2>Game Summary</h2>
+    <div class="summary-metrics">
+        <p>Total Earnings: $<span id="totalEarnings">0</span></p>
+        <p>Budget Remaining: $<span id="budgetRemaining">0</span></p>
+        <p>Game Marginal Value: <span id="gameMarginalValue">0</span></p>
+        <p>Risk Aversion Score: <span id="riskScore">0</span></p>
+    </div>
+    <canvas id="investmentChart"></canvas>
+    <button id="restartButton" class="submit-button">Play Again</button>
+    <button id="saveCSVButton" class="submit-button">Save CSV</button>
+</div>
+
 <div id="confettiContainer" class="confetti"></div>
 
 <script>
@@ -192,6 +231,8 @@
     const totalRounds = 10;
     const numInvestmentCards = 1;
     let currentInvestmentData = generateInvestmentValues(numInvestmentCards);
+    let totalSuccessfulInvestments = 0;
+    let totalInvestments = 0;
 
     // UI elements
     const budgetElement = document.getElementById("budget");
@@ -294,9 +335,11 @@
                 totalRoundValue += investmentValue;
                 messages.push(`Investment ${i + 1} successful! Added $${investmentValue} to total value.`);
                 investmentSuccess = true;
+                totalSuccessfulInvestments++;
             } else {
                 messages.push(`Investment ${i + 1} failed. Your bid of $${investmentAmount} was less than the required cost.`);
             }
+            totalInvestments++;
         }
 
         // Validate if the total investment exceeds the budget
@@ -402,8 +445,15 @@
         });
     }
 
-    // Function to convert game data to CSV format
-    function convertToCSV(data) {
+// Function to calculate risk score (Placeholder for now)
+function calculateRiskScore() {
+        let totalSpent = gameData.reduce((sum, data) => sum + parseFloat(data.UserSpent), 0);
+        let riskScore = ((totalSpent / (totalInvestments * 100)) * 100).toFixed(2);
+        return riskScore;
+    }
+
+     // Function to convert game data to CSV format
+     function convertToCSV(data) {
         const headers = [
             "GameID", "Round", "Card", "ValueDisplayed", "UserSpent", "ActualCost", "RemainingBudget", "TotalValue"
         ];
@@ -412,7 +462,7 @@
         return [headers.join(","), ...csvRows].join("\n");
     }
 
-    // Function to download CSV file
+// Function to download CSV file
     function downloadCSV(filename, csvContent) {
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
@@ -427,16 +477,173 @@
 
     // Function to save game results after the final round
     function saveGameResults() {
-        const saveConfirmation = confirm("Would you like to save your game results?");
-        if (saveConfirmation) {
+    displaySummaryPage();
+}
+
+// Function to display the summary page
+function displaySummaryPage() {
+        // Hide the game container and show the summary page
+        document.querySelector('.game-container').style.display = 'none';
+        document.getElementById('summaryPage').style.display = 'block';
+
+        // Update summary metrics
+        document.getElementById('totalEarnings').textContent = totalValue;
+        document.getElementById('budgetRemaining').textContent = budget;
+
+        let riskScore = calculateRiskScore();
+        document.getElementById('riskScore').textContent = riskScore;
+
+        // Calculate total spent
+        let totalSpent = gameData.reduce((sum, data) => sum + parseFloat(data.UserSpent), 0);
+
+        // Calculate Game Marginal Value
+        let gameMarginalValue = (totalValue / totalSpent).toFixed(2);
+        document.getElementById('gameMarginalValue').textContent = gameMarginalValue;
+
+        // Prepare data for the chart
+        let rounds = [];
+        let marginalValues = [];
+        let userSpent = [];
+
+        for (let round = 1; round <= totalRounds; round++) {
+            rounds.push(round);
+            let roundData = gameData.filter(data => data.Round === round);
+            let totalValueThisRound = roundData.reduce((sum, data) => sum + parseFloat(data.ValueDisplayed), 0);
+            let totalSpentThisRound = roundData.reduce((sum, data) => sum + parseFloat(data.UserSpent), 0);
+            let marginalValue = totalSpentThisRound > 0 ? (totalValueThisRound / totalSpentThisRound) : 0;
+           
+            // After calculating marginalValue and before pushing to arrays
+            marginalValue = isFinite(marginalValue) ? parseFloat(marginalValue.toFixed(2)) : 0;
+            totalSpentThisRound = isFinite(totalSpentThisRound) ? parseFloat(totalSpentThisRound.toFixed(2)) : 0;
+
+            marginalValues.push(marginalValue);
+            userSpent.push(totalSpentThisRound);
+        }
+            // Log data for debugging
+            console.log('Rounds:', rounds);
+            console.log('Marginal Values:', marginalValues);
+            console.log('User Spent:', userSpent);
+
+        // Render the chart
+        renderInvestmentChart(rounds, marginalValues, userSpent);
+
+        // Add event listener for restart button
+        document.getElementById('restartButton').addEventListener('click', () => {
+            // Reset game variables
+            budget = 500;
+            totalValue = 0;
+            currentRound = 1;
+            totalSuccessfulInvestments = 0;
+            totalInvestments = 0;
+            gameData.length = 0; // Clear the gameData array
+
+            // Update UI elements
+            updateUI();
+            currentPeriodElement.textContent = currentRound;
+            messageArea.innerHTML = '';
+            messageArea.classList.remove('hidden');
+
+            // Hide the summary page and show the game container
+            document.getElementById('summaryPage').style.display = 'none';
+            document.querySelector('.game-container').style.display = 'block';
+
+            // Generate new investment data and reset inputs
+            currentInvestmentData = generateInvestmentValues(numInvestmentCards);
+            resetInputs();
+        });
+
+        // Add event listener for the saveCSVButton
+        document.getElementById('saveCSVButton').addEventListener('click', () => {
             const csvContent = convertToCSV(gameData);
             const filename = `game_results.csv`;
             downloadCSV(filename, csvContent);
             alert("Your game results have been saved.");
-        } else {
-            alert("Game results were not saved.");
-        }
+        });
     }
+
+    // Declare a variable to hold the chart instance
+let investmentChartInstance;
+
+function renderInvestmentChart(rounds, marginalValues, userSpent) {
+    const ctx = document.getElementById('investmentChart').getContext('2d');
+
+    // Destroy previous chart instance if it exists
+    if (investmentChartInstance) {
+        investmentChartInstance.destroy();
+    }
+
+    investmentChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: rounds,
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Marginal Value',
+                    data: marginalValues,
+                    borderColor: '#e76f51',
+                    backgroundColor: 'rgba(231, 111, 81, 0.2)',
+                    yAxisID: 'y',
+                    fill: true,
+                    tension: 0.4, // Adds smooth curves to the line
+                },
+                {
+                    type: 'bar',
+                    label: 'Amount Spent',
+                    data: userSpent,
+                    backgroundColor: '#2a9d8f',
+                    yAxisID: 'y1',
+                }
+            ]
+        },
+            options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2,
+            scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Round'
+                }
+            },
+            y: {
+                position: 'left',
+                title: {
+                    display: true,
+                    text: 'Marginal Value'
+                },
+                beginAtZero: true,
+                suggestedMax: 5, // Set a reasonable maximum value
+            },
+            y1: {
+                position: 'right',
+                title: {
+                    display: true,
+                    text: 'Amount Spent ($)'
+                },
+                grid: {
+                    drawOnChartArea: false,
+                },
+                beginAtZero: true,
+                suggestedMax: 100, // Maximum amount spent per round
+            }
+    },
+            plugins: {
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                legend: {
+                    display: true,
+                    position: 'top',
+                },
+            },
+        }
+    });
+}
+
+
 })();
 </script>
 
