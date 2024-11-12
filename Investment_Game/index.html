@@ -186,6 +186,46 @@
             padding: 15px;
         }
     }
+
+/* Modal Styles */
+.modal {
+    display: block; /* Hidden by default, will be shown via JavaScript */
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.7); /* Black background with opacity */
+}
+
+.modal-content {
+    background-color: #ffffff;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 500px;
+    text-align: left;
+    color: #333;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+}
+
+.modal-content p {
+    font-size: 1em;
+    line-height: 1.5;
+}
+
+.modal-content .submit-button {
+    margin-top: 20px;
+    width: auto;
+}
+
+    
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -220,6 +260,17 @@
 
 <div id="confettiContainer" class="confetti"></div>
 
+    <!-- Instructions Modal -->
+    <div id="instructionsModal" class="modal">
+        <div class="modal-content">
+            <h2>Welcome to the Investment Game</h2>
+            <p>Welcome to the investment game, an experimental study in decision-making. The game has 10 rounds and takes about 5 minutes. By following these instructions carefully, you have a good chance of earning a score that is higher than average.</p>
+            <p>You will start the game with a budget of $500 to spend over the 10 rounds. At the start of each round, you’ll see an investment opportunity worth between $0 and $100. Each round, decide how much you want to spend to win the investment. Your chances of winning the round depend on how much you spend: for example, spending $1 gives you a 1% chance, $50 gives you a 50% chance, and $100 guarantees a win. You can choose to spend any amount, as long as you don’t exceed your total budget.</p>
+            <p>Your goal is to maximize your total winnings by the end of the game. Unspent money won’t count toward your final score. Good luck!</p>
+            <button id="startGameButton" class="submit-button">Start Game</button>
+        </div>
+    </div>
+
 <script>
 (() => {
     // Game data and variables
@@ -243,6 +294,7 @@
     const submitButton = document.getElementById("submitButton");
     const messageArea = document.getElementById("messageArea");
     const confettiContainer = document.getElementById("confettiContainer");
+    const instructionsModal = document.getElementById('instructionsModal');
 
     // Update UI with initial values
     updateUI();
@@ -645,6 +697,40 @@ function renderInvestmentChart(rounds, marginalValues, userSpent) {
 
 
 })();
+
+ // Event listener for the "Start Game" button
+ document.getElementById('startGameButton').addEventListener('click', () => {
+                // Hide the instructions modal
+                instructionsModal.style.display = 'none';
+
+                // Remove the blur effect
+                document.querySelector('.game-container').style.filter = 'none';
+
+                // Mark instructions as shown
+                sessionStorage.setItem('instructionsShown', 'true');
+
+                // Set focus to the first input
+                const firstInput = document.querySelector('.game-container input');
+                if (firstInput) {
+                    firstInput.focus();
+                }
+            });
+
+            // Event listener to show the modal on page load
+            document.addEventListener('DOMContentLoaded', () => {
+                if (!sessionStorage.getItem('instructionsShown')) {
+                    // Show the instructions modal
+                    instructionsModal.style.display = 'block';
+
+                    // Disable interaction with the game until the modal is closed
+                    document.querySelector('.game-container').style.filter = 'blur(2px)';
+                } else {
+                    // If instructions have been shown, ensure modal is hidden and game is active
+                    instructionsModal.style.display = 'none';
+                    document.querySelector('.game-container').style.filter = 'none';
+                }
+            });
+
 </script>
 
 </body>
